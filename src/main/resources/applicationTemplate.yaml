@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: #
+  data:
+    mongodb:
+      uri: mongodb://user:key@host:port/projectName?authSource=admin
+      auto-index-creation: true
+
+jwt:
+  secret: #
+  expiration: 360000
+  generator:
+    issuer: #
+
+book-share:
+  api-key: #
