@@ -5,7 +5,9 @@ spring:
     mongodb:
       uri: mongodb://user:key@host:port/projectName?authSource=admin
       auto-index-creation: true
-
+  redis:
+    host: #
+    port: #
 jwt:
   secret: #
   expiration: 360000

@@ -47,12 +47,12 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
-    public Mono<BookDTO> saveBook(BookDTO bookDTO) {
+    public Mono<BookDTO> saveBookNoCached(BookDTO bookDTO) {
         return searchBookValidity(bookDTO.title(), bookDTO.author())
-                .flatMap(openBook -> Mono.just(new BookDocument())
+                .flatMap(webBook -> Mono.just(new BookDocument())
                         .doOnNext(newBook -> {
-                            newBook.setTitle(openBook.get("title"));
-                            newBook.setAuthor(openBook.get("author"));
+                            newBook.setTitle(webBook.get("title"));
+                            newBook.setAuthor(webBook.get("author"));
                             newBook.setDescription(bookDTO.description());
                         })
                         .flatMap(bookRepository::save)
@@ -67,6 +67,13 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
+    public Mono<BookDTO> saveBookCached(BookDTO book) {
+        return bookRepository.save(toDocument(book))
+                .map(this::toDTO)
+                .onErrorMap(err -> new BookShareException(HttpStatus.BAD_REQUEST, err.getMessage()));
+    }
+
+    @Override
     public Mono<BookDTO> updateBook(String id, BookDTO book) {
         return null;
     }
@@ -76,7 +83,7 @@ public class BookServiceImpl implements BookService {
         return null;
     }
 
-    private Mono<Map<String, String>> searchBookValidity(String title, String author){
+    public Mono<Map<String, String>> searchBookValidity(String title, String author){
         String query = String.format("q=intitle:%s+inauthor:%s&maxResults=5&key=%s", title, author, BOOK_SHARE_KEY);
         WebClient webClientOpenBook = webClientBuilder.baseUrl("https://www.googleapis.com/books/v1").build();
         Map<String, String> result = new HashMap<>();

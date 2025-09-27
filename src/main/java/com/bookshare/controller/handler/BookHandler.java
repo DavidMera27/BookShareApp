@@ -1,7 +1,9 @@
 package com.bookshare.controller.handler;
 
 import com.bookshare.document.BookDocument;
+import com.bookshare.document.cacher.BookInfo;
 import com.bookshare.service.BookService;
+import com.bookshare.service.impl.BookCacheService;
 import com.bookshare.utils.ObjectValidator;
 import com.bookshare.wrapper.BookDTO;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import reactor.core.publisher.Mono;
 public class BookHandler {
 
     private final BookService bookService;
+    private final BookCacheService bookCacheService;
     private final ObjectValidator objectValidator;
 
     public Mono<ServerResponse> getAllBooks(ServerRequest serverRequest){
@@ -32,8 +35,19 @@ public class BookHandler {
         return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(book, BookDTO.class);
     }
 
-    public Mono<ServerResponse> saveProduct(ServerRequest serverRequest){
+    public Mono<ServerResponse> saveBook(ServerRequest serverRequest){
         Mono<BookDTO> book = serverRequest.bodyToMono(BookDTO.class).doOnNext(objectValidator::validate);
-        return book.flatMap(b -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(bookService.saveBook(b), BookDTO.class));
+
+        return book.flatMap(bookDTO ->
+                bookCacheService.getBook(bookDTO.title())//if cached, transform from Info to DTO and save
+                        .doOnNext(a -> System.out.println("obtenido de cache"))
+                        .flatMap(info -> bookService.saveBookCached(new BookDTO(info.title(), info.author(), bookDTO.description())))
+                        .switchIfEmpty(//if not cached, save it as Info to cache and return DTO
+                                bookService.saveBookNoCached(bookDTO)
+                                        .doOnNext(a -> System.out.println("obtenido de webclient"))
+                                        .flatMap(dto -> bookCacheService.saveBook(dto.title(), new BookInfo(dto.title(), dto.author()))
+                                                .thenReturn(dto))
+                        )
+                        .flatMap(finalBook -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(finalBook)));
     }
 }

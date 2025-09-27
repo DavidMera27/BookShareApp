@@ -10,7 +10,9 @@ public interface BookService {
 
     Mono<BookDTO> getById(String id);
 
-    Mono<BookDTO> saveBook(BookDTO book);
+    Mono<BookDTO> saveBookNoCached(BookDTO book);
+
+    Mono<BookDTO> saveBookCached(BookDTO book);
 
     Mono<BookDTO> updateBook(String id, BookDTO book);
 
