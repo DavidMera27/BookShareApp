@@ -50,4 +50,11 @@ public class BookHandler {
                         )
                         .flatMap(finalBook -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(finalBook)));
     }
+
+    public Mono<ServerResponse> updateBook(ServerRequest serverRequest){
+        String id = serverRequest.pathVariable("id");
+        Mono<BookDTO> bookDesc = serverRequest.bodyToMono(BookDTO.class);
+        return bookDesc
+                .flatMap(dto -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(bookService.updateBook(id, dto), BookDTO.class));
+    }
 }

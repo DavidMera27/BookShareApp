@@ -74,8 +74,15 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
-    public Mono<BookDTO> updateBook(String id, BookDTO book) {
-        return null;
+    public Mono<BookDTO> updateBook(String id, BookDTO dto) {
+        return bookRepository.findById(id)
+                .flatMap(book -> {
+                    book.setDescription(dto.description());
+                    return bookRepository.save(book);
+                })
+                .map(this::toDTO);
+//        return bookRepository.save(toDocument(book))
+//                .map(this::toDTO);
     }
 
     @Override

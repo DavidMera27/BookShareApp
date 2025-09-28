@@ -18,7 +18,7 @@ public class BookRouter {
                 .GET(PATH, handler::getAllBooks)
                 .GET(PATH + "/{id}", handler::getOne)
                 .POST(PATH, handler::saveBook)
-//                .PUT(PATH + "/{id}", handler::updateProduct)
+                .PUT(PATH + "/{id}", handler::updateBook)
 //                .DELETE(PATH + "/{id}", handler::deleteProduct)
                 .build();
     }
