@@ -5,21 +5,21 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Setter
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
-@Document(collection = "books")
-@CompoundIndex(name = "unique_title_issuer", def = "{'title': 1, 'issuer': 1}", unique = true)
-public class BookDocument {
+@Document(collection = "profiles")
+public class ProfileDocument {
 
     @Id
     private String id;
 
-    private String title;
-    private String author;
-    private String issuer;
+    @Indexed(unique = true)
+    private String username;
+
+//    private String userId;
 }

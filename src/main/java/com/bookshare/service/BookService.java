@@ -1,20 +1,26 @@
 package com.bookshare.service;
 
-import com.bookshare.document.BookDocument;
-import com.bookshare.wrapper.BookDTO;
+import com.bookshare.wrapper.request.BookRequest;
+import com.bookshare.wrapper.response.BookResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public interface BookService {
-    Flux<BookDTO> findAllBooks();
+    Flux<BookResponse> findAllBooks();
 
-    Mono<BookDTO> getById(String id);
+    Mono<BookResponse> getById(String id);
 
-    Mono<BookDTO> saveBookNoCached(BookDTO book);
+    Flux<BookResponse> findByTitle(String input);
 
-    Mono<BookDTO> saveBookCached(BookDTO book);
+    Flux<BookResponse> searchBookInside(BookRequest bookDTO);
 
-    Mono<BookDTO> updateBook(String id, BookDTO book);
+    Flux<BookResponse> searchBookOutside(BookRequest bookDTO);
+
+    Mono<BookRequest> subscribeBookCached(BookRequest bookDTO);
+
+    Mono<BookResponse> saveBookNoCached(BookRequest bookDTO);
+
+    Mono<BookResponse> updateBook(String id, BookRequest bookDTO);
 
     Mono<Void> deleteBook(String id);
 }
