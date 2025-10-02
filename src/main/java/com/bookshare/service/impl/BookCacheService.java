@@ -20,10 +20,8 @@ public class BookCacheService {
 
     private final ReactiveRedisTemplate<String, String> redisTemplateIndexes;
 
-    public BookCacheService(
-            @Qualifier("bookRedisTemplate") ReactiveRedisTemplate<String, BookResponse> bookRedisTemplate,
-            @Qualifier("indexRedisTemplate") ReactiveRedisTemplate<String, String> indexRedisTemplate
-    ) {
+    public BookCacheService(@Qualifier("bookRedisTemplate") ReactiveRedisTemplate<String, BookResponse> bookRedisTemplate,
+                            @Qualifier("indexRedisTemplate") ReactiveRedisTemplate<String, String> indexRedisTemplate) {
         this.redisTemplateBook = bookRedisTemplate;
         this.redisTemplateIndexes = indexRedisTemplate;
     }
@@ -48,8 +46,12 @@ public class BookCacheService {
 
         Mono<Boolean> saveMain = redisTemplateBook.opsForValue().set(bookId, book, Duration.ofHours(1));
 
-        List<Mono<Long>> indexOps = keywords.stream()
-                .map(word -> redisTemplateIndexes.opsForSet().add("idx:" + word, bookId))
+        List<Mono<Boolean>> indexOps = keywords.stream()
+                .map(word -> {
+                    String key = "idx:" + word;
+                    return redisTemplateIndexes.opsForSet().add(key, bookId)
+                            .then(redisTemplateIndexes.expire(key, Duration.ofHours(1)));
+                })
                 .toList();
 
         return Mono.zip(saveMain, Mono.when(indexOps)).thenReturn(true);
@@ -61,25 +63,14 @@ public class BookCacheService {
                 .toLowerCase()
                 .replaceAll("[^a-z0-9\\s]", "")
                 .trim();
-
+        System.out.println(noAccent);
+        System.out.println(Arrays.toString(noAccent.split("\\s+")));
         String[] words = noAccent.split("\\s+");
         return Arrays.stream(words)
-                .limit(7)
+                .filter(word -> word.length() >= 4)
+                .distinct()
+                .sorted((a, b) -> Integer.compare(b.length(), a.length()))
+                .limit(3)
                 .toList();
     }
-
-
-//    public Mono<BookRequest> getBook(String key) {
-//        return redisTemplate.opsForValue().get(this.normalizeTitle(key));
-//    }
-//
-//    public Mono<Boolean> saveBook(String key, BookRequest book) {
-//        return redisTemplate.opsForValue().set(this.normalizeTitle(key), book, Duration.ofHours(1));
-//    }
-//
-//    public String normalizeTitle(String title) {
-//        String noAccent = Normalizer.normalize(title, Normalizer.Form.NFD)
-//                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
-//        return noAccent.toLowerCase().replaceAll("[^a-z0-9]", "").trim();
-//    }
 }

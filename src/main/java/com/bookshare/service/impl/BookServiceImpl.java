@@ -78,7 +78,7 @@ public class BookServiceImpl implements BookService {
         return searchBookValidity(bookDTO.title(), bookDTO.author())
                 .flatMap(webBook -> Mono.just(new BookDocument())
                         .doOnNext(newBook -> {
-                            newBook.setTitle(webBook.get("title"));
+                            newBook.setTitle((webBook.get("title").split("[*&%$#@./;|\\-_()\\[\\]]")[0].trim()));
                             newBook.setAuthor(webBook.get("author"));
                             newBook.setIssuer(bookDTO.issuer());
                         })
@@ -132,6 +132,7 @@ public class BookServiceImpl implements BookService {
                         //For logs only
                         items.forEach(i -> {
                             JsonNode volInfo = i.get("volumeInfo");
+                            if(!volInfo.has("title") || !volInfo.has("authors")){return;}
                             JsonNode imageLinks = volInfo.get("imageLinks");
                             String smallThumbnail = imageLinks != null && imageLinks.has("smallThumbnail")
                                     ? imageLinks.get("smallThumbnail").asText()

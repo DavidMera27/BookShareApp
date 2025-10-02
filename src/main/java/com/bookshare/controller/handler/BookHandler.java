@@ -1,7 +1,6 @@
 package com.bookshare.controller.handler;
 
 import com.bookshare.document.BookDocument;
-import com.bookshare.document.cacher.BookInfo;
 import com.bookshare.service.BookService;
 import com.bookshare.service.impl.BookCacheService;
 import com.bookshare.utils.ObjectValidator;
@@ -67,22 +66,6 @@ public class BookHandler {
                                 .thenReturn(dto))
                         .flatMap(finalBook -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(finalBook)));
     }
-
-//    public Mono<ServerResponse> saveBook(ServerRequest serverRequest){
-//        Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
-//
-//        return book.flatMap(bookDTO ->
-//                bookCacheService.getBook(bookDTO.title())//if cached, transform from Info to DTO and save
-//                        .doOnNext(a -> System.out.println("obtenido de cache"))
-//                        .flatMap(info -> bookService.saveBookCached(new BookRequest(info.title(), info.author(), bookDTO.description())))
-//                        .switchIfEmpty(//if not cached, save it as Info to cache and return DTO
-//                                bookService.saveBookNoCached(bookDTO)
-//                                        .doOnNext(a -> System.out.println("obtenido de webclient"))
-//                                        .flatMap(dto -> bookCacheService.saveBook(dto.title(), new BookInfo(dto.title(), dto.author()))
-//                                                .thenReturn(dto))
-//                        )
-//                        .flatMap(finalBook -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(finalBook)));
-//    }
 
     public Mono<ServerResponse> updateBook(ServerRequest serverRequest){
         String id = serverRequest.pathVariable("id");
