@@ -19,10 +19,11 @@ public class BookRouter {
                 .GET(PATH + "/{id}", handler::getOneById)
                 .POST(PATH + "/inside", handler::searchBookInside)
                 .POST(PATH + "/outside", handler::searchBookOutside)
-                .POST(PATH + "/subscribe", handler::subscribeToBook)
+                .POST(PATH + "/outsideMore", handler::searchBookOutsideDeeper)
+                .POST(PATH + "/subscribe", handler::subscribeBook)
                 .POST(PATH + "/save", handler::saveBook)
-//                .PUT(PATH + "/{id}", handler::updateBook)
-//                .DELETE(PATH + "/{id}", handler::deleteProduct)
+                .DELETE(PATH + "unsubscribe", handler::unsubscribeBook)
+                .DELETE(PATH + "delete/{id}", handler::deleteBook)
                 .build();
     }
 }

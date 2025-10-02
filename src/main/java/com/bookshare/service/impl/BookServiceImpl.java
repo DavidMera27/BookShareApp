@@ -17,8 +17,11 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
-import java.text.Normalizer;
 import java.time.Duration;
+
+import static com.bookshare.utils.ServiceUtils.normalizeTitle;
+import static com.bookshare.utils.ServiceUtils.printBooks;
+
 
 @Service
 @RequiredArgsConstructor
@@ -48,7 +51,7 @@ public class BookServiceImpl implements BookService {
 
     @Override
     public Flux<BookResponse> findByTitleInside(String input){
-        return bookRepository.findByTitleContainingIgnoreCase(input)
+        return bookRepository.findByTitleContainingIgnoreCase(normalizeTitle(input))
                 .map(this::toDTO);
     }
 
@@ -65,10 +68,7 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
-    public Mono<BookRequest> subscribeBookCached(BookRequest book) {
-//        return bookRepository.save(toDocument(book))
-//                .map(this::toDTO)
-//                .onErrorMap(err -> new BookShareException(HttpStatus.BAD_REQUEST, err.getMessage()));
+    public Mono<BookResponse> subscribeBook(String subscriber, String bookId) {
         return null;
     }
 
@@ -86,24 +86,12 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
-    public Mono<BookResponse> updateBook(String id, BookRequest dto) {
-//        return bookRepository.findById(id)
-//                .flatMap(book -> {
-//                    book.setDescription(dto.description());
-//                    return bookRepository.save(book);
-//                })
-//                .map(this::toDTO);
-        return null;
-    }
-
-    @Override
     public Mono<Void> deleteBook(String id) {
         return null;
     }
 
 
-
-    //#######################UTILITY-METHODS#######################
+    //<--Complements
     public Flux<BookResponse> searchBookValidity(String title, String author){
         String query = String.format("q=intitle:%s+inauthor:%s&maxResults=5&key=%s", title, author, BOOK_SHARE_KEY);
         WebClient webClientOpenBook = webClientBuilder.baseUrl("https://www.googleapis.com/books/v1").build();
@@ -114,12 +102,9 @@ public class BookServiceImpl implements BookService {
                 .bodyToMono(JsonNode.class)
                 .flatMapMany(json -> {
                     JsonNode items = json.get("items");
+                    if (items == null || !items.isArray() || items.isEmpty()) throw new BookShareException(HttpStatus.BAD_REQUEST, NOT_FOUND_MESSAGE);
                     printBooks(items);
-                    if (items != null && items.isArray() && !items.isEmpty()) {
-                        return Flux.fromIterable(items);
-                    } else {
-                        throw new BookShareException(HttpStatus.BAD_REQUEST, "NOT_FOUND_MESSAGE");
-                    }
+                    return Flux.fromIterable(items);
                 })
                 .flatMap(jsonNode -> {
                     JsonNode volumeInfo = jsonNode.get("volumeInfo");
@@ -128,34 +113,6 @@ public class BookServiceImpl implements BookService {
                     String foundAuthor = volumeInfo.get("authors").get(0).asText();
                     return Mono.just(new BookResponse(null, normalizeTitle(foundTitle), foundAuthor, null));
                 });
-    }
-
-    private void printBooks(JsonNode items){//for logs only
-        items.forEach(i -> {
-            JsonNode volInfo = i.get("volumeInfo");
-            if(volInfo == null || !volInfo.has("title") || !volInfo.has("authors")){return;}
-            JsonNode imageLinks = volInfo.get("imageLinks");
-            String smallThumbnail = imageLinks != null && imageLinks.has("smallThumbnail")
-                    ? imageLinks.get("smallThumbnail").asText()
-                    : null;
-            String thumbnail = imageLinks != null && imageLinks.has("thumbnail")
-                    ? imageLinks.get("thumbnail").asText()
-                    : null;
-            System.out.println(volInfo.get("title").asText() + " " +
-                    volInfo.get("authors").get(0).asText() + " " +
-                    smallThumbnail + " " +
-                    thumbnail);});
-    }
-
-    public static String normalizeTitle(String title) {
-        if (title == null || title.isEmpty()) return "";
-
-        String cleaned = title.split("[*&%$#@./;|\\-_()\\[\\]]")[0].trim();
-
-        String normalized = Normalizer.normalize(cleaned, Normalizer.Form.NFD);
-        normalized = normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
-
-        return normalized;
     }
 
     private BookDocument toDocument(BookRequest book){
@@ -169,4 +126,5 @@ public class BookServiceImpl implements BookService {
     private BookResponse toDTO(BookDocument book){
         return new BookResponse(book.getId(), book.getTitle(), book.getAuthor(), book.getIssuer());
     }
+    //Complements-->
 }

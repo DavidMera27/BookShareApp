@@ -14,11 +14,9 @@ public interface BookService {
 
     Flux<BookResponse> findByTitleOutside(BookRequest bookDTO);
 
-    Mono<BookRequest> subscribeBookCached(BookRequest bookDTO);
+    Mono<BookResponse> subscribeBook(String subscriber, String bookId);
 
     Mono<BookResponse> saveBook(BookRequest bookDTO);
-
-    Mono<BookResponse> updateBook(String id, BookRequest bookDTO);
 
     Mono<Void> deleteBook(String id);
 }

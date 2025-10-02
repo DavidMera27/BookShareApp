@@ -55,6 +55,22 @@ public class BookHandler {
         Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
 
         return book.flatMap(bookDTO ->
+                bookCacheService.getBooks(bookDTO.title())
+                        .switchIfEmpty(bookService.findByTitleOutside(bookDTO))
+                        .collectList()
+                        .flatMap(books -> {
+                            if(books.isEmpty()) return ServerResponse.notFound().build();
+                            return ServerResponse.ok()
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .body(Flux.fromIterable(books), BookResponse.class);
+                        })
+        );
+    }
+
+    public Mono<ServerResponse> searchBookOutsideDeeper(ServerRequest serverRequest){
+        Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
+
+        return book.flatMap(bookDTO ->
                 bookService.findByTitleOutside(bookDTO)
                         .collectList()
                         .flatMap(books -> {
@@ -66,7 +82,7 @@ public class BookHandler {
         );
     }
 
-    public Mono<ServerResponse> subscribeToBook(ServerRequest serverRequest){
+    public Mono<ServerResponse> subscribeBook(ServerRequest serverRequest){
         return null;
     }
 
@@ -76,15 +92,17 @@ public class BookHandler {
         return book.flatMap(bookDTO ->
                 bookService.saveBook(bookDTO)
                         .flatMap(saved -> bookCacheService.getBooks(saved.title())
-                                        .switchIfEmpty(bookCacheService.saveBook(saved.title(), saved).thenReturn(saved))
-                                        .then(Mono.just(saved)))
+                                .doOnNext(bb -> System.out.println(bb.title() + "FROM REDIS B4 SAVE"))
+                                .switchIfEmpty(bookCacheService.saveBook(saved.title(), saved).thenReturn(saved))
+                                .then(Mono.just(saved)))
                         .flatMap(finalBook -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(finalBook)));
     }
 
-    public Mono<ServerResponse> updateBook(ServerRequest serverRequest){
-        String id = serverRequest.pathVariable("id");
-        Mono<BookRequest> bookDesc = serverRequest.bodyToMono(BookRequest.class);
-        return bookDesc
-                .flatMap(dto -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(bookService.updateBook(id, dto), BookRequest.class));
+    public Mono<ServerResponse> unsubscribeBook(ServerRequest serverRequest){
+        return null;
+    }
+
+    public Mono<ServerResponse> deleteBook(ServerRequest serverRequest){
+        return null;
     }
 }
