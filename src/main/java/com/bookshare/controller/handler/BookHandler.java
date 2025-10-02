@@ -40,7 +40,8 @@ public class BookHandler {
 
         return book.flatMap(bookDTO ->
                 bookService.findByTitleInside(bookDTO.title())
-                        .switchIfEmpty(bookCacheService.getBooks(bookDTO.title()))
+                        .mergeWith(bookCacheService.getBooks(bookDTO.title()))
+                        .distinct(BookResponse::id)
                         .collectList()
                         .flatMap(books -> {
                             if (books.isEmpty()) return ServerResponse.notFound().build();
@@ -51,7 +52,7 @@ public class BookHandler {
         );
     }
 
-    public Mono<ServerResponse> searchBookOutside(ServerRequest serverRequest){
+    public Mono<ServerResponse> searchBookOutside(ServerRequest serverRequest){//searches into redis if empty then into google books
         Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
 
         return book.flatMap(bookDTO ->
@@ -67,7 +68,7 @@ public class BookHandler {
         );
     }
 
-    public Mono<ServerResponse> searchBookOutsideDeeper(ServerRequest serverRequest){
+    public Mono<ServerResponse> searchBookOutsideDeeper(ServerRequest serverRequest){//searches straight into google books
         Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
 
         return book.flatMap(bookDTO ->
