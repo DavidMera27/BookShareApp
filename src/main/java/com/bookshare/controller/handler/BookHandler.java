@@ -29,7 +29,7 @@ public class BookHandler {
                 .body(books, BookDocument.class);
     }
 
-    public Mono<ServerResponse> getOne(ServerRequest serverRequest){
+    public Mono<ServerResponse> getOneById(ServerRequest serverRequest){
         String id = serverRequest.pathVariable("id");
         Mono<BookResponse> book = bookService.getById(id);
         return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(book, BookRequest.class);
@@ -39,13 +39,11 @@ public class BookHandler {
         Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
 
         return book.flatMap(bookDTO ->
-                bookCacheService.getBooks(bookDTO.title())
-                        .switchIfEmpty(bookService.findByTitle(bookDTO.title()))
+                bookService.findByTitleInside(bookDTO.title())
+                        .switchIfEmpty(bookCacheService.getBooks(bookDTO.title()))
                         .collectList()
                         .flatMap(books -> {
-                            if (books.isEmpty()) {
-                                return ServerResponse.notFound().build();
-                            }
+                            if (books.isEmpty()) return ServerResponse.notFound().build();
                             return ServerResponse.ok()
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .body(Flux.fromIterable(books), BookResponse.class);
@@ -54,6 +52,21 @@ public class BookHandler {
     }
 
     public Mono<ServerResponse> searchBookOutside(ServerRequest serverRequest){
+        Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
+
+        return book.flatMap(bookDTO ->
+                bookService.findByTitleOutside(bookDTO)
+                        .collectList()
+                        .flatMap(books -> {
+                            if(books.isEmpty()) return ServerResponse.notFound().build();
+                            return ServerResponse.ok()
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .body(Flux.fromIterable(books), BookResponse.class);
+                        })
+        );
+    }
+
+    public Mono<ServerResponse> subscribeToBook(ServerRequest serverRequest){
         return null;
     }
 
@@ -61,9 +74,10 @@ public class BookHandler {
         Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
 
         return book.flatMap(bookDTO ->
-                bookService.saveBookNoCached(bookDTO)
-                        .flatMap(dto -> bookCacheService.saveBook(dto.title(), dto)
-                                .thenReturn(dto))
+                bookService.saveBook(bookDTO)
+                        .flatMap(saved -> bookCacheService.getBooks(saved.title())
+                                        .switchIfEmpty(bookCacheService.saveBook(saved.title(), saved).thenReturn(saved))
+                                        .then(Mono.just(saved)))
                         .flatMap(finalBook -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(finalBook)));
     }
 

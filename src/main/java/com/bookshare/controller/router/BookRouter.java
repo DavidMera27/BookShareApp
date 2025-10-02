@@ -16,9 +16,11 @@ public class BookRouter {
     RouterFunction<ServerResponse> router(BookHandler handler){
         return RouterFunctions.route()
                 .GET(PATH, handler::getAllBooks)
-                .GET(PATH + "/{id}", handler::getOne)
+                .GET(PATH + "/{id}", handler::getOneById)
                 .POST(PATH + "/inside", handler::searchBookInside)
-                .POST(PATH, handler::saveBook)
+                .POST(PATH + "/outside", handler::searchBookOutside)
+                .POST(PATH + "/subscribe", handler::subscribeToBook)
+                .POST(PATH + "/save", handler::saveBook)
 //                .PUT(PATH + "/{id}", handler::updateBook)
 //                .DELETE(PATH + "/{id}", handler::deleteProduct)
                 .build();

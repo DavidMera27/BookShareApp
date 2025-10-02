@@ -10,15 +10,13 @@ public interface BookService {
 
     Mono<BookResponse> getById(String id);
 
-    Flux<BookResponse> findByTitle(String input);
+    Flux<BookResponse> findByTitleInside(String input);
 
-    Flux<BookResponse> searchBookInside(BookRequest bookDTO);
-
-    Flux<BookResponse> searchBookOutside(BookRequest bookDTO);
+    Flux<BookResponse> findByTitleOutside(BookRequest bookDTO);
 
     Mono<BookRequest> subscribeBookCached(BookRequest bookDTO);
 
-    Mono<BookResponse> saveBookNoCached(BookRequest bookDTO);
+    Mono<BookResponse> saveBook(BookRequest bookDTO);
 
     Mono<BookResponse> updateBook(String id, BookRequest bookDTO);
 

@@ -17,11 +17,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
+import java.text.Normalizer;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -50,19 +47,21 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
-    public Flux<BookResponse> findByTitle(String input){
+    public Flux<BookResponse> findByTitleInside(String input){
         return bookRepository.findByTitleContainingIgnoreCase(input)
                 .map(this::toDTO);
     }
 
     @Override
-    public Flux<BookResponse> searchBookInside(BookRequest bookDTO) {
-        return null;
-    }
-
-    @Override
-    public Flux<BookResponse> searchBookOutside(BookRequest book) {
-        return null;
+    public Flux<BookResponse> findByTitleOutside(BookRequest bookDTO) {
+        return searchBookValidity(bookDTO.title(), bookDTO.author())
+                .onErrorMap(err -> new BookShareException(HttpStatus.BAD_REQUEST, err.getMessage()))
+                .retryWhen(Retry.backoff(1, Duration.ofSeconds(5))
+                        .filter(ex -> ex instanceof WebClientResponseException.TooManyRequests)
+                        .onRetryExhaustedThrow((spec, signal) ->
+                                new BookShareException(HttpStatus.BAD_REQUEST, NOT_FOUND_MESSAGE)
+                        )
+                );
     }
 
     @Override
@@ -74,16 +73,9 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
-    public Mono<BookResponse> saveBookNoCached(BookRequest bookDTO) {
-        return searchBookValidity(bookDTO.title(), bookDTO.author())
-                .flatMap(webBook -> Mono.just(new BookDocument())
-                        .doOnNext(newBook -> {
-                            newBook.setTitle((webBook.get("title").split("[*&%$#@./;|\\-_()\\[\\]]")[0].trim()));
-                            newBook.setAuthor(webBook.get("author"));
-                            newBook.setIssuer(bookDTO.issuer());
-                        })
-                        .flatMap(bookRepository::save)
-                        .map(this::toDTO))
+    public Mono<BookResponse> saveBook(BookRequest bookDTO) {
+        return bookRepository.save(this.toDocument(bookDTO))
+                .map(this::toDTO)
                 .onErrorMap(err -> new BookShareException(HttpStatus.BAD_REQUEST, err.getMessage()))
                 .retryWhen(Retry.backoff(1, Duration.ofSeconds(5))
                         .filter(ex -> ex instanceof WebClientResponseException.TooManyRequests)
@@ -112,50 +104,65 @@ public class BookServiceImpl implements BookService {
 
 
     //#######################UTILITY-METHODS#######################
-    public Mono<Map<String, String>> searchBookValidity(String title, String author){
+    public Flux<BookResponse> searchBookValidity(String title, String author){
         String query = String.format("q=intitle:%s+inauthor:%s&maxResults=5&key=%s", title, author, BOOK_SHARE_KEY);
         WebClient webClientOpenBook = webClientBuilder.baseUrl("https://www.googleapis.com/books/v1").build();
-        Map<String, String> result = new HashMap<>();
 
         return webClientOpenBook.get()
                 .uri("/volumes?" + query)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .map(json -> {
+                .flatMapMany(json -> {
                     JsonNode items = json.get("items");
+                    printBooks(items);
                     if (items != null && items.isArray() && !items.isEmpty()) {
-                        JsonNode volumeInfo = items.get(0).get("volumeInfo");
-                        String tituloEncontrado = volumeInfo.get("title").asText();
-                        String autorEncontrado = volumeInfo.get("authors").get(0).asText();
-                        result.put("title", tituloEncontrado);
-                        result.put("author", autorEncontrado);
-                        //For logs only
-                        items.forEach(i -> {
-                            JsonNode volInfo = i.get("volumeInfo");
-                            if(!volInfo.has("title") || !volInfo.has("authors")){return;}
-                            JsonNode imageLinks = volInfo.get("imageLinks");
-                            String smallThumbnail = imageLinks != null && imageLinks.has("smallThumbnail")
-                                    ? imageLinks.get("smallThumbnail").asText()
-                                    : null;
-                            String thumbnail = imageLinks != null && imageLinks.has("thumbnail")
-                                    ? imageLinks.get("thumbnail").asText()
-                                    : null;
-                            System.out.println(volInfo.get("title").asText() + " " +
-                                    volInfo.get("authors").get(0).asText() + " " +
-                                    smallThumbnail + " " +
-                                    thumbnail);});
-                        //...
-                        return result;
+                        return Flux.fromIterable(items);
                     } else {
                         throw new BookShareException(HttpStatus.BAD_REQUEST, "NOT_FOUND_MESSAGE");
                     }
+                })
+                .flatMap(jsonNode -> {
+                    JsonNode volumeInfo = jsonNode.get("volumeInfo");
+                    if(volumeInfo == null || !volumeInfo.has("title") || !volumeInfo.has("authors")) return Mono.empty();
+                    String foundTitle = volumeInfo.get("title").asText();
+                    String foundAuthor = volumeInfo.get("authors").get(0).asText();
+                    return Mono.just(new BookResponse(null, normalizeTitle(foundTitle), foundAuthor, null));
                 });
+    }
+
+    private void printBooks(JsonNode items){//for logs only
+        items.forEach(i -> {
+            JsonNode volInfo = i.get("volumeInfo");
+            if(volInfo == null || !volInfo.has("title") || !volInfo.has("authors")){return;}
+            JsonNode imageLinks = volInfo.get("imageLinks");
+            String smallThumbnail = imageLinks != null && imageLinks.has("smallThumbnail")
+                    ? imageLinks.get("smallThumbnail").asText()
+                    : null;
+            String thumbnail = imageLinks != null && imageLinks.has("thumbnail")
+                    ? imageLinks.get("thumbnail").asText()
+                    : null;
+            System.out.println(volInfo.get("title").asText() + " " +
+                    volInfo.get("authors").get(0).asText() + " " +
+                    smallThumbnail + " " +
+                    thumbnail);});
+    }
+
+    public static String normalizeTitle(String title) {
+        if (title == null || title.isEmpty()) return "";
+
+        String cleaned = title.split("[*&%$#@./;|\\-_()\\[\\]]")[0].trim();
+
+        String normalized = Normalizer.normalize(cleaned, Normalizer.Form.NFD);
+        normalized = normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+
+        return normalized;
     }
 
     private BookDocument toDocument(BookRequest book){
         BookDocument bookDocument = new BookDocument();
-        bookDocument.setTitle(book.title());
+        bookDocument.setTitle(normalizeTitle(book.title()));;
         bookDocument.setAuthor(book.author());
+        bookDocument.setIssuer(book.issuer());
         return bookDocument;
     }
 
