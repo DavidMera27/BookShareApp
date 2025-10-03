@@ -76,13 +76,12 @@ public class BookServiceImpl implements BookService {
     public Mono<BookResponse> saveBook(BookRequest bookDTO) {
         return bookRepository.save(this.toDocument(bookDTO))
                 .map(this::toDTO)
-                .onErrorMap(err -> new BookShareException(HttpStatus.BAD_REQUEST, err.getMessage()))
-                .retryWhen(Retry.backoff(1, Duration.ofSeconds(5))
-                        .filter(ex -> ex instanceof WebClientResponseException.TooManyRequests)
-                        .onRetryExhaustedThrow((spec, signal) ->
-                                new BookShareException(HttpStatus.BAD_REQUEST, NOT_FOUND_MESSAGE)
-                        )
-                );
+                .onErrorMap(err -> new BookShareException(HttpStatus.BAD_REQUEST, err.getMessage()));
+    }
+
+    @Override
+    public Mono<BookResponse> unsubscribeBook(String subscriber, String bookId) {
+        return null;
     }
 
     @Override
@@ -109,9 +108,15 @@ public class BookServiceImpl implements BookService {
                 .flatMap(jsonNode -> {
                     JsonNode volumeInfo = jsonNode.get("volumeInfo");
                     if(volumeInfo == null || !volumeInfo.has("title") || !volumeInfo.has("authors")) return Mono.empty();
+                    JsonNode bookImageLinks =  volumeInfo.has("imageLinks")
+                            ? volumeInfo.get("imageLinks")
+                            : null;
+                    String bookThumbnail = bookImageLinks != null && bookImageLinks.has("thumbnail")
+                            ? bookImageLinks.get("thumbnail").asText()
+                            : null;
                     String foundTitle = volumeInfo.get("title").asText();
                     String foundAuthor = volumeInfo.get("authors").get(0).asText();
-                    return Mono.just(new BookResponse(null, normalizeTitle(foundTitle), foundAuthor, null));
+                    return Mono.just(new BookResponse(null, normalizeTitle(foundTitle), foundAuthor, null, bookThumbnail, null, null));
                 });
     }
 
@@ -120,11 +125,18 @@ public class BookServiceImpl implements BookService {
         bookDocument.setTitle(normalizeTitle(book.title()));;
         bookDocument.setAuthor(book.author());
         bookDocument.setIssuer(book.issuer());
+        bookDocument.setImage(book.image());
         return bookDocument;
     }
 
     private BookResponse toDTO(BookDocument book){
-        return new BookResponse(book.getId(), book.getTitle(), book.getAuthor(), book.getIssuer());
+        return new BookResponse(book.getId(),
+                book.getTitle(),
+                book.getAuthor(),
+                book.getIssuer(),
+                book.getImage(),
+                book.getCreatedAt().toString(),
+                book.getModifiedAt().toString());
     }
     //Complements-->
 }

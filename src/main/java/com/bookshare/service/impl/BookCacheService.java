@@ -1,7 +1,7 @@
 package com.bookshare.service.impl;
 
+import com.bookshare.utils.BookRedisTemplateProvider;
 import com.bookshare.wrapper.response.BookResponse;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -19,10 +19,9 @@ public class BookCacheService {
 
     private final ReactiveRedisTemplate<String, String> redisTemplateIndexes;
 
-    public BookCacheService(@Qualifier("bookRedisTemplate") ReactiveRedisTemplate<String, BookResponse> bookRedisTemplate,
-                            @Qualifier("indexRedisTemplate") ReactiveRedisTemplate<String, String> indexRedisTemplate) {
-        this.redisTemplateBook = bookRedisTemplate;
-        this.redisTemplateIndexes = indexRedisTemplate;
+    public BookCacheService(BookRedisTemplateProvider redisProvider) {
+        this.redisTemplateBook = redisProvider.getTemplateBooks();
+        this.redisTemplateIndexes = redisProvider.getTemplateIndexes();
     }
 
     public Flux<BookResponse> getBooks(String userInput) {

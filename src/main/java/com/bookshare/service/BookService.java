@@ -18,5 +18,7 @@ public interface BookService {
 
     Mono<BookResponse> saveBook(BookRequest bookDTO);
 
+    Mono<BookResponse> unsubscribeBook(String subscriber, String bookId);
+
     Mono<Void> deleteBook(String id);
 }

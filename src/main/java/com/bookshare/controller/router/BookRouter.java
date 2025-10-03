@@ -22,8 +22,8 @@ public class BookRouter {
                 .POST(PATH + "/outsideMore", handler::searchBookOutsideDeeper)
                 .POST(PATH + "/subscribe", handler::subscribeBook)
                 .POST(PATH + "/save", handler::saveBook)
-                .DELETE(PATH + "unsubscribe", handler::unsubscribeBook)
-                .DELETE(PATH + "delete/{id}", handler::deleteBook)
+                .DELETE(PATH + "/unsubscribe", handler::unsubscribeBook)
+                .DELETE(PATH + "/delete/{id}", handler::deleteBook)
                 .build();
     }
 }

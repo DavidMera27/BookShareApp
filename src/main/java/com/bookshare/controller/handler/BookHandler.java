@@ -19,7 +19,9 @@ import reactor.core.publisher.Mono;
 public class BookHandler {
 
     private final BookService bookService;
+
     private final BookCacheService bookCacheService;
+
     private final ObjectValidator objectValidator;
 
     public Mono<ServerResponse> getAllBooks(ServerRequest serverRequest){
@@ -35,7 +37,7 @@ public class BookHandler {
         return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(book, BookRequest.class);
     }
 
-    public Mono<ServerResponse> searchBookInside(ServerRequest serverRequest){
+    public Mono<ServerResponse> searchBookInside(ServerRequest serverRequest){//Looks into mongodb and redis
         Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
 
         return book.flatMap(bookDTO ->
@@ -93,7 +95,6 @@ public class BookHandler {
         return book.flatMap(bookDTO ->
                 bookService.saveBook(bookDTO)
                         .flatMap(saved -> bookCacheService.getBooks(saved.title())
-                                .doOnNext(bb -> System.out.println(bb.title() + "FROM REDIS B4 SAVE"))
                                 .switchIfEmpty(bookCacheService.saveBook(saved.title(), saved).thenReturn(saved))
                                 .then(Mono.just(saved)))
                         .flatMap(finalBook -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(finalBook)));
