@@ -1,5 +1,6 @@
 package com.bookshare.service;
 
+import com.bookshare.document.cacheable.BookCache;
 import com.bookshare.wrapper.request.BookRequest;
 import com.bookshare.wrapper.response.BookResponse;
 import reactor.core.publisher.Flux;
@@ -10,15 +11,17 @@ public interface BookService {
 
     Mono<BookResponse> getById(String id);
 
-    Flux<BookResponse> findByTitleInside(String input);
+    Flux<BookResponse> findByTitleInside(String title);
 
-    Flux<BookResponse> findByTitleOutside(BookRequest bookDTO);
+    Flux<BookResponse> findByAuthorInside(String author);
+
+    Flux<BookCache> findByTitleOutside(BookRequest bookDTO);
 
     Mono<BookResponse> subscribeBook(String subscriber, String bookId);
 
     Mono<BookResponse> saveBook(BookRequest bookDTO);
 
-    Mono<BookResponse> unsubscribeBook(String subscriber, String bookId);
+    Mono<Void> unsubscribeBook(String subscriber, String bookId);
 
     Mono<Void> deleteBook(String id);
 }

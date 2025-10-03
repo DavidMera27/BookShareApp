@@ -8,5 +8,7 @@ import reactor.core.publisher.Mono;
 public interface BookRepository extends ReactiveMongoRepository<BookDocument, String> {
     Flux<BookDocument> findByTitleContainingIgnoreCase(String title);//findByTituloRegexIgnoreCase(".*coronel.*escriba.*");
 
+    Flux<BookDocument> findByAuthorContainingIgnoreCase(String author);
+
     Mono<BookDocument> findByAuthor(String author);
 }

@@ -14,6 +14,8 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Optional;
+
 @Component
 @RequiredArgsConstructor
 public class BookHandler {
@@ -37,29 +39,32 @@ public class BookHandler {
         return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(book, BookRequest.class);
     }
 
-    public Mono<ServerResponse> searchBookInside(ServerRequest serverRequest){//Looks into mongodb and redis
-        Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
+    public Mono<ServerResponse> searchBookInside(ServerRequest serverRequest){//Looks into mongodb
+        Optional<String> userInput = serverRequest.queryParam("search");
 
-        return book.flatMap(bookDTO ->
-                bookService.findByTitleInside(bookDTO.title())
-                        .mergeWith(bookCacheService.getBooks(bookDTO.title()))
-                        .distinct(BookResponse::id)
+        return Mono.justOrEmpty(userInput)
+                .flatMap(search ->
+                bookService.findByTitleInside(search)
+                        .switchIfEmpty(bookService.findByAuthorInside(search))
                         .collectList()
                         .flatMap(books -> {
                             if (books.isEmpty()) return ServerResponse.notFound().build();
                             return ServerResponse.ok()
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .body(Flux.fromIterable(books), BookResponse.class);
-                        })
-        );
+                        }))
+                .switchIfEmpty(ServerResponse.badRequest().build());
     }
 
     public Mono<ServerResponse> searchBookOutside(ServerRequest serverRequest){//searches into redis if empty then into google books
         Mono<BookRequest> book = serverRequest.bodyToMono(BookRequest.class).doOnNext(objectValidator::validate);
 
         return book.flatMap(bookDTO ->
-                bookCacheService.getBooks(bookDTO.title())
-                        .switchIfEmpty(bookService.findByTitleOutside(bookDTO))
+                bookCacheService.getBooksByTitle(bookDTO.title())
+                        .switchIfEmpty(bookService.findByTitleOutside(bookDTO)
+                                .flatMap(found -> bookCacheService.getBooksById(found.id())
+                                        .switchIfEmpty(bookCacheService.saveBook(found).thenReturn(found))
+                                        .then(Mono.just(found))))
                         .collectList()
                         .flatMap(books -> {
                             if(books.isEmpty()) return ServerResponse.notFound().build();
@@ -75,6 +80,9 @@ public class BookHandler {
 
         return book.flatMap(bookDTO ->
                 bookService.findByTitleOutside(bookDTO)
+                        .flatMap(found -> bookCacheService.getBooksById(found.id())
+                                .switchIfEmpty(bookCacheService.saveBook(found).thenReturn(found))
+                                .then(Mono.just(found)))
                         .collectList()
                         .flatMap(books -> {
                             if(books.isEmpty()) return ServerResponse.notFound().build();
@@ -94,9 +102,6 @@ public class BookHandler {
 
         return book.flatMap(bookDTO ->
                 bookService.saveBook(bookDTO)
-                        .flatMap(saved -> bookCacheService.getBooks(saved.title())
-                                .switchIfEmpty(bookCacheService.saveBook(saved.title(), saved).thenReturn(saved))
-                                .then(Mono.just(saved)))
                         .flatMap(finalBook -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).bodyValue(finalBook)));
     }
 

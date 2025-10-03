@@ -1,6 +1,7 @@
 package com.bookshare.service.impl;
 
 import com.bookshare.document.BookDocument;
+import com.bookshare.document.cacheable.BookCache;
 import com.bookshare.exception.BookShareException;
 import com.bookshare.repository.BookRepository;
 import com.bookshare.service.BookService;
@@ -50,13 +51,19 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
-    public Flux<BookResponse> findByTitleInside(String input){
-        return bookRepository.findByTitleContainingIgnoreCase(normalizeTitle(input))
+    public Flux<BookResponse> findByTitleInside(String title){
+        return bookRepository.findByTitleContainingIgnoreCase(normalizeTitle(title))
                 .map(this::toDTO);
     }
 
     @Override
-    public Flux<BookResponse> findByTitleOutside(BookRequest bookDTO) {
+    public Flux<BookResponse> findByAuthorInside(String author){
+        return bookRepository.findByAuthorContainingIgnoreCase(normalizeTitle(author))
+                .map(this::toDTO);
+    }
+
+    @Override
+    public Flux<BookCache> findByTitleOutside(BookRequest bookDTO) {
         return searchBookValidity(bookDTO.title(), bookDTO.author())
                 .onErrorMap(err -> new BookShareException(HttpStatus.BAD_REQUEST, err.getMessage()))
                 .retryWhen(Retry.backoff(1, Duration.ofSeconds(5))
@@ -80,7 +87,7 @@ public class BookServiceImpl implements BookService {
     }
 
     @Override
-    public Mono<BookResponse> unsubscribeBook(String subscriber, String bookId) {
+    public Mono<Void> unsubscribeBook(String subscriber, String bookId) {
         return null;
     }
 
@@ -91,7 +98,7 @@ public class BookServiceImpl implements BookService {
 
 
     //<--Complements
-    public Flux<BookResponse> searchBookValidity(String title, String author){
+    public Flux<BookCache> searchBookValidity(String title, String author){
         String query = String.format("q=intitle:%s+inauthor:%s&maxResults=5&key=%s", title, author, BOOK_SHARE_KEY);
         WebClient webClientOpenBook = webClientBuilder.baseUrl("https://www.googleapis.com/books/v1").build();
 
@@ -106,6 +113,7 @@ public class BookServiceImpl implements BookService {
                     return Flux.fromIterable(items);
                 })
                 .flatMap(jsonNode -> {
+                    String webBookId = jsonNode.get("id").asText();
                     JsonNode volumeInfo = jsonNode.get("volumeInfo");
                     if(volumeInfo == null || !volumeInfo.has("title") || !volumeInfo.has("authors")) return Mono.empty();
                     JsonNode bookImageLinks =  volumeInfo.has("imageLinks")
@@ -116,7 +124,7 @@ public class BookServiceImpl implements BookService {
                             : null;
                     String foundTitle = volumeInfo.get("title").asText();
                     String foundAuthor = volumeInfo.get("authors").get(0).asText();
-                    return Mono.just(new BookResponse(null, normalizeTitle(foundTitle), foundAuthor, null, bookThumbnail, null, null));
+                    return Mono.just(new BookCache(webBookId, normalizeTitle(foundTitle), foundAuthor, bookThumbnail));
                 });
     }
 
